@@ -217,20 +217,20 @@ MINITRACE_EXPORT void internal_mtr_raw_event_arg(const char *category, const cha
 
 #ifdef MTR_ENABLED
 // These are optimized to use X events (combined B and E). Much easier to do in C++ than in C.
+// Fork: These now use B and E instead of X. Read more: https://github.com/hrydgard/minitrace/issues/39
 class MTRScopedTrace {
 public:
 	MTRScopedTrace(const char *category, const char *name)
 		: category_(category), name_(name) {
-		start_time_ = mtr_time_s();
+		internal_mtr_raw_event(category_, name_, 'B', 0);
 	}
 	~MTRScopedTrace() {
-		internal_mtr_raw_event(category_, name_, 'X', &start_time_);
+		internal_mtr_raw_event(category_, name_, 'E', 0);
 	}
 
 private:
 	const char *category_;
 	const char *name_;
-	double start_time_;
 };
 
 // Only outputs a block if execution time exceeded the limit.

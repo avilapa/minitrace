@@ -54,7 +54,7 @@ typedef struct raw_event {
 		const char *a_str;
 		int a_int;
 		double a_double;
-	};
+	} arg_t;
 } raw_event_t;
 
 static raw_event_t *event_buffer;
@@ -294,19 +294,18 @@ void mtr_flush_with_state(int is_last) {
 
 	for (i = 0; i < event_count_copy; i++) {
 		raw_event_t *raw = &flush_buffer[i];
-		int len;
 		switch (raw->arg_type) {
 		case MTR_ARG_TYPE_INT:
-			snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":%i", raw->arg_name, raw->a_int);
+			snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":%i", raw->arg_name, raw->arg_t.a_int);
 			break;
 		case MTR_ARG_TYPE_STRING_CONST:
-			snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
+			snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":\"%s\"", raw->arg_name, raw->arg_t.a_str);
 			break;
 		case MTR_ARG_TYPE_STRING_COPY:
-			if (strlen(raw->a_str) > 700) {
-				snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":\"%.*s\"", raw->arg_name, 700, raw->a_str);
+			if (strlen(raw->arg_t.a_str) > 700) {
+				snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":\"%.*s\"", raw->arg_name, 700, raw->arg_t.a_str);
 			} else {
-				snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":\"%s\"", raw->arg_name, raw->a_str);
+				snprintf(arg_buf, ARRAY_SIZE(arg_buf), "\"%s\":\"%s\"", raw->arg_name, raw->arg_t.a_str);
 			}
 			break;
 		case MTR_ARG_TYPE_NONE:
@@ -322,7 +321,7 @@ void mtr_flush_with_state(int is_last) {
 				snprintf(id_buf, ARRAY_SIZE(id_buf), ",\"id\":\"0x%08x\"", (uint32_t)(uintptr_t)raw->id);
 				break;
 			case 'X':
-				snprintf(id_buf, ARRAY_SIZE(id_buf), ",\"dur\":%i", (int)raw->a_double);
+				snprintf(id_buf, ARRAY_SIZE(id_buf), ",\"dur\":%i", (int)raw->arg_t.a_double);
 				break;
 			}
 		} else {
@@ -334,24 +333,23 @@ void mtr_flush_with_state(int is_last) {
 		char temp[256];
 		{
 			int len = (int)strlen(cat);
-			int i;
 			if (len > 255) len = 255;
-			for (i = 0; i < len; i++) {
-				temp[i] = cat[i] == '\\' ? '/' : cat[i];
+			for (int j = 0; j < len; j++) {
+				temp[j] = cat[j] == '\\' ? '/' : cat[j];
 			}
 			temp[len] = 0;
 			cat = temp;
 		}
 #endif
 
-		len = snprintf(linebuf, ARRAY_SIZE(linebuf), "%s{\"cat\":\"%s\",\"pid\":%i,\"tid\":%i,\"ts\":%" PRId64 ",\"ph\":\"%c\",\"name\":\"%s\",\"args\":{%s}%s}",
+		int len = snprintf(linebuf, ARRAY_SIZE(linebuf), "%s{\"cat\":\"%s\",\"pid\":%i,\"tid\":%i,\"ts\":%" PRId64 ",\"ph\":\"%c\",\"name\":\"%s\",\"args\":{%s}%s}",
 				first_line ? "" : ",\n",
 				cat, raw->pid, raw->tid, raw->ts - time_offset, raw->ph, raw->name, arg_buf, id_buf);
 		fwrite(linebuf, 1, len, f);
 		first_line = 0;
 
 		if (raw->arg_type == MTR_ARG_TYPE_STRING_COPY) {
-			free((void*)raw->a_str);
+			free((void*)raw->arg_t.a_str);
 		}
 		#ifdef MTR_COPY_EVENT_CATEGORY_AND_NAME
 		free(raw->name);
@@ -412,7 +410,7 @@ void internal_mtr_raw_event(const char *category, const char *name, char ph, voi
 		double x;
 		memcpy(&x, id, sizeof(double));
 		ev->ts = (int64_t)(x * 1000000);
-		ev->a_double = (ts - x) * 1000000;
+		ev->arg_t.a_double = (ts - x) * 1000000;
 	} else {
 		ev->ts = (int64_t)(ts * 1000000);
 	}
@@ -471,9 +469,9 @@ void internal_mtr_raw_event_arg(const char *category, const char *name, char ph,
 	ev->arg_type = arg_type;
 	ev->arg_name = arg_name;
 	switch (arg_type) {
-	case MTR_ARG_TYPE_INT: ev->a_int = (int)(uintptr_t)arg_value; break;
-	case MTR_ARG_TYPE_STRING_CONST:	ev->a_str = (const char*)arg_value; break;
-	case MTR_ARG_TYPE_STRING_COPY: ev->a_str = strdup((const char*)arg_value); break;
+	case MTR_ARG_TYPE_INT: ev->arg_t.a_int = (int)(uintptr_t)arg_value; break;
+	case MTR_ARG_TYPE_STRING_CONST:	ev->arg_t.a_str = (const char*)arg_value; break;
+	case MTR_ARG_TYPE_STRING_COPY: ev->arg_t.a_str = strdup((const char*)arg_value); break;
 	case MTR_ARG_TYPE_NONE: break;
 	}
 
